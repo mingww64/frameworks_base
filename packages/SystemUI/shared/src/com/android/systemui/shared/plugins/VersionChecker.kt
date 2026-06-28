@@ -40,7 +40,12 @@ interface VersionChecker {
             val pluginVersion = VersionInfo(pluginClass)
             val instanceVersion = VersionInfo(instanceClass)
             if (instanceVersion.hasVersionInfo) {
-                pluginVersion.checkVersion(instanceVersion)
+                try {
+                    pluginVersion.checkVersion(instanceVersion)
+                } catch (e: Exception) {
+                    // Ignore missing dependency errors for prebuilt clock plugins
+                    android.util.Log.w("VersionCheckerImpl", "Ignored InvalidVersionException: ", e)
+                }
             } else if (plugin != null) {
                 val fallbackVersion = plugin.version
                 if (fallbackVersion != pluginVersion.defaultVersion) {

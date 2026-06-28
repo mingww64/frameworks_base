@@ -457,6 +457,8 @@ class PluginInstance<T : Plugin>(
                 "com.android.systemui.common",
                 "com.android.systemui.log",
                 "com.android.systemui.plugin",
+                "com.android.systemui.plugins",
+                "com.android.systemui.shared.plugins",
                 "com.android.compose.animation.scene",
                 "kotlin.jvm.functions",
             )
