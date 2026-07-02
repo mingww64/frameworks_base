@@ -235,6 +235,7 @@ public class AutomaticBrightnessController {
     // Use PowerManager.BRIGHTNESS_INVALID_FLOAT if there is no current auto-brightness value
     // available.
     private float mScreenAutoBrightness = PowerManager.BRIGHTNESS_INVALID_FLOAT;
+    private float mSmoothedScreenBrightness = Float.NaN;
 
     // The screen brightness level before clamping and throttling. This value needs to be stored
     // for concurrent displays mode and passed to the additional displays which will do their own
@@ -950,12 +951,17 @@ public class AutomaticBrightnessController {
         mSlowAmbientLux = calculateAmbientLux(time, mAmbientLightHorizonLong);
         mFastAmbientLux = calculateAmbientLux(time, mAmbientLightHorizonShort);
 
-        if ((mSlowAmbientLux >= mAmbientBrighteningThreshold
+        boolean isBrightening = mSlowAmbientLux >= mAmbientBrighteningThreshold
                 && mFastAmbientLux >= mAmbientBrighteningThreshold
-                && nextBrightenTransition <= time)
-                || (mSlowAmbientLux <= mAmbientDarkeningThreshold
-                        && mFastAmbientLux <= mAmbientDarkeningThreshold
-                        && nextDarkenTransition <= time)) {
+                && nextBrightenTransition <= time;
+        boolean isDarkening = mSlowAmbientLux <= mAmbientDarkeningThreshold
+                && mFastAmbientLux <= mAmbientDarkeningThreshold
+                && nextDarkenTransition <= time;
+
+        if (isBrightening) {
+        }
+
+        if (isBrightening || isDarkening) {
             mPreThresholdLux = mAmbientLux;
             setAmbientLux(mFastAmbientLux);
             if (mLoggingEnabled) {
@@ -1442,7 +1448,36 @@ public class AutomaticBrightnessController {
             if (mLightSensorEnabled) {
                 // The time received from the sensor is in nano seconds, hence changing it to ms
                 final long time = TimeUnit.NANOSECONDS.toMillis(event.timestamp);
-                final float lux = event.values[0];
+                float lux = event.values[0];
+
+                boolean fixEnabled = android.os.SystemProperties.getBoolean("persist.sys.udfps.brightness_fix", false);
+                if (fixEnabled && !Float.isNaN(mScreenAutoBrightness) && mScreenAutoBrightness >= 0.0f) {
+                    float maxBleed = android.os.SystemProperties.getInt("persist.sys.udfps.lux_threshold", 0);
+                    if (maxBleed > 0) {
+                        float alphaUp = 0.2f;
+                        float alphaDown = 0.2f;
+                        try {
+                            String alphaUpStr = android.os.SystemProperties.get("persist.sys.udfps.alpha_up", "0.2");
+                            String alphaDownStr = android.os.SystemProperties.get("persist.sys.udfps.alpha_down", "0.2");
+                            alphaUp = Float.parseFloat(alphaUpStr);
+                            alphaDown = Float.parseFloat(alphaDownStr);
+                        } catch (Exception e) {}
+                        if (Float.isNaN(mSmoothedScreenBrightness)) {
+                            mSmoothedScreenBrightness = mScreenAutoBrightness;
+                        } else {
+                            float alpha = (mScreenAutoBrightness > mSmoothedScreenBrightness) ? alphaUp : alphaDown;
+                            mSmoothedScreenBrightness = mSmoothedScreenBrightness * (1 - alpha) + mScreenAutoBrightness * alpha;
+                        }
+                        
+                        float expectedBleed = mSmoothedScreenBrightness * maxBleed;
+                        
+                        lux = Math.max(0.0f, lux - expectedBleed);
+                        if (mLoggingEnabled) {
+                            Slog.d(TAG, "UDFPS Fix: raw=" + event.values[0] + ", expectedBleed=" + expectedBleed + ", adjusted=" + lux);
+                        }
+                    }
+                }
+
                 handleLightSensorEvent(time, lux);
             }
         }
