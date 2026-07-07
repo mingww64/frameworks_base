@@ -1442,6 +1442,47 @@ public class AutomaticBrightnessController {
         }
     }
 
+    private android.view.CompositionSamplingListener mSamplingListener = null;
+    private float mLastAvgLuminance = 1.0f;
+    private android.graphics.Rect mSamplingRect = new android.graphics.Rect();
+    private String mLastAlsRect = "";
+
+    private void updateSamplingListener() {
+        String alsRect = android.os.SystemProperties.get("persist.sys.als_rect", "287,141,100,100");
+        if (alsRect.isEmpty()) {
+            return; // Not configured
+        }
+        if (!alsRect.equals(mLastAlsRect)) {
+            mLastAlsRect = alsRect;
+            try {
+                String[] parts = alsRect.split(",");
+                if (parts.length == 4) {
+                    int x = Integer.parseInt(parts[0].trim());
+                    int y = Integer.parseInt(parts[1].trim());
+                    int w = Integer.parseInt(parts[2].trim());
+                    int h = Integer.parseInt(parts[3].trim());
+                    mSamplingRect.set(x, y, x + w, y + h);
+                    
+                    if (mSamplingListener != null) {
+                        mSamplingListener.destroy();
+                    }
+                    mSamplingListener = new android.view.CompositionSamplingListener(
+                            (command) -> mHandler.post(command)) {
+                        @Override
+                        public void onSampleCollected(float medianLuma) {
+                            mLastAvgLuminance = medianLuma;
+                        }
+                    };
+                    android.view.CompositionSamplingListener.register(
+                            mSamplingListener, android.view.Display.DEFAULT_DISPLAY, null, mSamplingRect);
+                    Slog.i(TAG, "UDFPS Fix: Registered CompositionSamplingListener for rect: " + mSamplingRect);
+                }
+            } catch (Exception e) {
+                Slog.e(TAG, "UDFPS Fix: Failed to parse or register als_rect: " + alsRect, e);
+            }
+        }
+    }
+
     private final SensorEventListener mLightSensorListener = new SensorEventListener() {
         @Override
         public void onSensorChanged(SensorEvent event) {
@@ -1469,11 +1510,12 @@ public class AutomaticBrightnessController {
                             mSmoothedScreenBrightness = mSmoothedScreenBrightness * (1 - alpha) + mScreenAutoBrightness * alpha;
                         }
                         
-                        float expectedBleed = mSmoothedScreenBrightness * maxBleed;
+                        updateSamplingListener();
+                        float expectedBleed = mSmoothedScreenBrightness * maxBleed * mLastAvgLuminance;
                         
                         lux = Math.max(0.0f, lux - expectedBleed);
                         if (mLoggingEnabled) {
-                            Slog.d(TAG, "UDFPS Fix: raw=" + event.values[0] + ", expectedBleed=" + expectedBleed + ", adjusted=" + lux);
+                            Slog.d(TAG, "UDFPS Fix: raw=" + event.values[0] + ", expectedBleed=" + expectedBleed + ", avgLuminance=" + mLastAvgLuminance + ", adjusted=" + lux);
                         }
                     }
                 }
