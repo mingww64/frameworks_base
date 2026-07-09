@@ -255,6 +255,15 @@ public class UdfpsController implements DozeReceiver, Dumpable {
     private boolean mSmartPixelsFlag;
     private boolean mSmartPixelsEnabled;
 
+    private boolean mUseMtkGhbmDimming;
+
+    private UdfpsAnimation mUdfpsAnimation;
+    private boolean mKeyguardCallbackRegistered = false;
+
+    private boolean mDisableSmartPixels;
+    private boolean mSmartPixelsFlag;
+    private boolean mSmartPixelsEnabled;
+
     @VisibleForTesting
     public static final VibrationAttributes UDFPS_VIBRATION_ATTRIBUTES =
             new VibrationAttributes.Builder()
