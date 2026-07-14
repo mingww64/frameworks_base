@@ -818,8 +818,10 @@ public class BiometricUnlockController extends KeyguardUpdateMonitorCallback imp
         final boolean fingerprintLockout = biometricSourceType == BiometricSourceType.FINGERPRINT
                 && (msgId == FingerprintManager.FINGERPRINT_ERROR_LOCKOUT
                 || msgId == FingerprintManager.FINGERPRINT_ERROR_LOCKOUT_PERMANENT);
-        if (fingerprintLockout) {
-            mLogger.d("fingerprint locked out");
+        final boolean fingerprintTimeout = biometricSourceType == BiometricSourceType.FINGERPRINT
+                && msgId == FingerprintManager.FINGERPRINT_ERROR_TIMEOUT;
+        if (fingerprintLockout || fingerprintTimeout) {
+            mLogger.d(fingerprintLockout ? "fingerprint locked out" : "fingerprint timeout");
             startWakeAndUnlock(
                     MODE_SHOW_BOUNCER,
                     BiometricUnlockSource.Companion.fromBiometricSourceType(biometricSourceType)
