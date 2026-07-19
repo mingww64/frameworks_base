@@ -3115,6 +3115,12 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
     }
 
     void writeKernelMappingLPr(String name, int appId, int[] excludedUserIds) {
+        // APEX packages do not have an app ID.  Legacy sdcardfs configfs accepts only valid
+        // application IDs, so do not create an unusable mapping with appid=-1 for them.
+        if (appId < 0) {
+            return;
+        }
+
         KernelPackageState cur = mKernelMapping.get(name);
         final boolean firstTime = cur == null;
         final boolean userIdsChanged = firstTime

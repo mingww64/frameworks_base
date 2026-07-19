@@ -63,6 +63,12 @@ public final class FileIntegrity {
     @SystemApi(client = SystemApi.Client.SYSTEM_SERVER)
     public static void setUpFsVerity(@NonNull ParcelFileDescriptor parcelFileDescriptor)
             throws IOException {
+        // Devices launched before Android R are not required to provide fs-verity.  Their
+        // filesystems may reject FS_IOC_ENABLE_VERITY even when callers use this internal API
+        // directly, so make the platform capability check authoritative for every caller.
+        if (!VerityUtils.isFsVeritySupported()) {
+            return;
+        }
         VerityUtils.setUpFsverity(parcelFileDescriptor.getFd());
     }
 }
