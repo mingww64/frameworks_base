@@ -390,6 +390,14 @@ public class UdfpsController implements DozeReceiver, Dumpable {
                     return;
                 }
                 if (vendorCode == mUdfpsVendorCode) {
+                    // Legacy UDFPS HALs report their AOD touch through a vendor acquired
+                    // callback. Do not wake the device before applying the screen-off
+                    // unlock setting: after waking, the still-held touch can be handled as
+                    // a normal UDFPS touch and bypass the setting.
+                    if (mStatusBarStateController.isDozing()
+                            && !isScreenOffUnlockEnabled()) {
+                        return;
+                    }
                     mPowerManager.wakeUp(mSystemClock.uptimeMillis(),
                             PowerManager.WAKE_REASON_GESTURE, TAG);
                     onAodInterrupt(0, 0, 0, 0);
